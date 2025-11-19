@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Cricket Ground — Ledger & Bat Play</title>
+<style>
+:root {
+  --ground-size: 550px;
+  --player-size: 64px;
+}
+html,body{
+  height:100%; margin:0; background: linear-gradient(180deg,#073b07 0%, #0a5a0a 60%);
+  font-family:Inter,Arial,sans-serif; display:flex; align-items:center; justify-content:center; color:#fff; position:relative;
+}
+.app{display:flex;gap:24px;padding:20px;box-sizing:border-box;align-items:flex-start;}
+.fico-wrap{width:80px;display:flex;flex-direction:column;align-items:center; margin-top:60px;}
+.scoreboard{
+  width:300px; background: rgba(255,255,255,0.06); border-radius:12px; padding:14px;
+  box-shadow:0 8px 22px rgba(0,0,0,0.45); backdrop-filter: blur(4px); margin-top:60px;
+}
+.scoreboard h2{margin:0 0 12px 0;font-size:20px;text-align:center;}
+.score-item{margin:8px 0;font-size:16px;display:flex;justify-content:space-between;}
+.ground-wrap{width:var(--ground-size);height:var(--ground-size);position:relative;}
+#ground{width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 40% 30%,#2bbf2b 0%,#138013 45%,#0a5a0a 100%);border:6px solid rgba(255,255,255,0.12);position:relative;overflow:visible;box-shadow:0 18px 40px rgba(0,0,0,0.6), inset 0 6px 12px rgba(255,255,255,0.02);}
+#groundCanvas{position:absolute;left:0;top:0;width:100%;height:100%;z-index:5;pointer-events:none;}
+.pitch{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:40px;height:240px;background:#f3e9d7;border-radius:6px;}
+.crease{position:absolute;left:50%;width:80px;height:4px;background:white;transform:translateX(-50%);}
+#top-crease{top:calc(50% - 110px);}#bottom-crease{top:calc(50% + 110px);}
+.player{width:var(--player-size);height:var(--player-size);position:absolute;transform:translate(-50%,-50%);transition:left 1000ms ease, top 1000ms ease;z-index:120;user-select:none;pointer-events:auto;}
+.svg-root{width:100%;height:100%;display:block;}
+.bob{animation:bob 1.4s ease-in-out infinite;transform-origin:50% 50%;}
+@keyframes bob{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
+.bat{transform-origin:46px 26px;transition:transform 260ms ease;}
+.bat.swing{transform:rotate(28deg) translate(6px,-4px);}
+.player-label{font-size:14px;font-weight:bold;fill:#fff;text-anchor:middle;pointer-events:none;}
+#ball{width:18px;height:18px;border-radius:50%;background:red;position:absolute;transform:translate(-50%,-50%);transition:left 600ms cubic-bezier(.2,.9,.2,1), top 600ms cubic-bezier(.2,.9,.2,1);z-index:200;box-shadow: 0 6px 12px rgba(0,0,0,0.45), inset 0 -2px 6px rgba(0,0,0,0.18);}
+#playBtn{
+  display:block;
+  margin:100px auto 0 auto; /* center under scoreboard */
+  width:140px;
+  height:140px;
+  border-radius:50%;
+  border:none;
+  background:#ffd166;
+  color:#000;
+  font-weight:bold;
+  font-size:64px;
+  cursor:pointer;
+  box-shadow:0 6px 12px rgba(0,0,0,0.45);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="fico-wrap">
+    <svg class="svg-root bob" viewBox="0 0 64 64">
+      <circle cx="32" cy="12" r="7.5" fill="#ffd7b5"/>
+      <rect x="22" y="20" width="20" height="24" rx="4" fill="#0ea5a3"/>
+      <rect x="14" y="22" width="8" height="14" rx="3" fill="#0ea5a3"/>
+      <rect x="42" y="22" width="8" height="14" rx="3" fill="#0ea5a3"/>
+      <rect x="24" y="44" width="8" height="12" rx="2" fill="#333"/>
+      <rect x="34" y="44" width="8" height="12" rx="2" fill="#333"/>
+    </svg>
+    <div style="color:#fffff;font-weight:bold;margin-top:6px;">FICO</div>
+  </div>
+
+  <div>
+    <div class="scoreboard">
+      <h2>Ledger</h2>
+      <div class="score-item"><span>Transaction No</span><span id="txnNo">100000000</span></div>
+      <div class="score-item"><span>Income</span><span id="income">80000+</span></div>
+      <div class="score-item"><span>Expense</span><span id="expense">40000+</span></div>
+      <div class="score-item"><span>Asset</span><span id="asset">2.5Cr</span></div>
+    </div>
+
+    <!-- Play button below scoreboard -->
+    <button id="playBtn">🏏</button>
+  </div>
+
+  <div class="ground-wrap">
+    <div id="ground">
+      <canvas id="groundCanvas" width="640" height="640"></canvas>
+      <div class="pitch"></div>
+      <div id="top-crease" class="crease"></div>
+      <div id="bottom-crease" class="crease"></div>
+      <div id="ball"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const ground=document.getElementById('ground');
+const canvas=document.getElementById('groundCanvas');
+const ctx=canvas.getContext('2d');
+const ballEl=document.getElementById('ball');
+const playBtn=document.getElementById('playBtn');
+const txnNoEl=document.getElementById('txnNo');
+
+function resizeCanvas(){const r=ground.getBoundingClientRect();canvas.width=r.width;canvas.height=r.height;}
+resizeCanvas(); window.addEventListener('resize',resizeCanvas);
+
+function createHuman(label,withBat,shirt="#0ea5a3"){
+  const wrap=document.createElement('div'); wrap.className='player';
+  const batSvg=withBat? `<g class="bat"><rect x="38" y="18" width="18" height="4" rx="2" fill="#b45309"/></g>`:'';
+  wrap.innerHTML=`<svg class="svg-root bob" viewBox="0 0 64 64">
+    <circle cx="32" cy="12" r="7.5" fill="#ffd7b5"/>
+    <rect x="22" y="20" width="20" height="20" rx="4" fill="${shirt}"/>
+    <rect x="14" y="22" width="8" height="12" rx="3" fill="${shirt}" transform="rotate(-6 14 22)"/>
+    <rect x="42" y="22" width="8" height="12" rx="3" fill="${shirt}" transform="rotate(6 42 22)"/>
+    <rect x="24" y="40" width="6" height="14" rx="2" fill="#123"/>
+    <rect x="34" y="40" width="6" height="14" rx="2" fill="#123"/>
+    ${batSvg}<text x="32" y="60" class="player-label">${label}</text></svg>`;
+  ground.appendChild(wrap);
+  return wrap;
+}
+
+// Create players
+const bowler=createHuman('SD',false,'#0ea5a3');
+const striker=createHuman('ABAP',true);
+const nonStriker=createHuman('ABAP',true,'#0ea5a3');
+const f1=createHuman('MM',false);
+const f2=createHuman('MM',false);
+const f3=createHuman('PP',false);
+const f4=createHuman('PP',false);
+const f5=createHuman('SD',false);
+
+function setPos(el,x,y){ el.style.left=x+'px'; el.style.top=y+'px'; }
+function setBallAt(el){ ballEl.style.left=el.style.left; ballEl.style.top=el.style.top; }
+
+function placePlayers(){
+  const r=ground.getBoundingClientRect();
+  const W=r.width,H=r.height,cx=W/2,cy=H/2;
+  setPos(bowler,cx,cy-200);
+  setPos(striker,cx,cy+110);
+  setPos(nonStriker,cx,cy-110);
+  setPos(f1,cx+180,cy-60);
+  setPos(f2,cx+220,cy+30);
+  setPos(f3,cx,cy+200);
+  setPos(f4,cx-180,cy+80);
+  setPos(f5,cx-220,cy-40);
+  setBallAt(bowler);
+}
+placePlayers();
+
+const sequence=[bowler,striker,f1,f2,f3,f4,f5,bowler];
+let idx=0;
+
+function updateTxnNo(){ txnNoEl.textContent=(100000000 + Math.floor(Math.random()*900000000)); }
+
+function drawTrail(fromEl,toEl){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.beginPath();
+  ctx.moveTo(parseFloat(fromEl.style.left),parseFloat(fromEl.style.top));
+  ctx.lineTo(parseFloat(toEl.style.left),parseFloat(toEl.style.top));
+  ctx.strokeStyle='rgba(255,255,255,0.65)';
+  ctx.lineWidth=2; ctx.setLineDash([6,6]); ctx.stroke();
+  setTimeout(()=>ctx.clearRect(0,0,canvas.width,canvas.height),700);
+}
+
+function swingBat(p){ const bat=p.querySelector('.bat'); if(bat){ bat.classList.add('swing'); setTimeout(()=>bat.classList.remove('swing'),300);} }
+
+playBtn.addEventListener('click',()=>{
+  const prev=sequence[idx]; idx=(idx+1)%sequence.length;
+  const next=sequence[idx];
+  drawTrail(prev,next);
+  setBallAt(next);
+  if(prev===bowler && next===striker){ swingBat(striker); }
+  updateTxnNo();
+});
+updateTxnNo();
+})();
+</script>
+</body>
+</html>
