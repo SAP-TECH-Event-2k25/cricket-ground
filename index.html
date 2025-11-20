@@ -9,12 +9,13 @@
   --ground-size: 550px;
   --player-size: 64px;
 }
+
 html,body{
   height:100%; margin:0; background: linear-gradient(180deg,#073b07 0%, #0a5a0a 60%);
   font-family:Inter,Arial,sans-serif; display:flex; align-items:center; justify-content:center; color:#fff; position:relative;
 }
 .app{display:flex;gap:24px;padding:20px;box-sizing:border-box;align-items:flex-start;}
-.fico-wrap{width:80px;display:flex;flex-direction:column;align-items:center; margin-top:60px;}
+.fico-wrap{width:80px;display:flex-direction:column;align-items:center; margin-top:60px;}
 .scoreboard{
   width:300px; background: rgba(255,255,255,0.06); border-radius:12px; padding:14px;
   box-shadow:0 8px 22px rgba(0,0,0,0.45); backdrop-filter: blur(4px); margin-top:60px;
@@ -33,51 +34,56 @@ html,body{
 @keyframes bob{0%{transform:translateY(0)}50%{transform:translateY(-6px)}100%{transform:translateY(0)}}
 .bat{transform-origin:46px 26px;transition:transform 260ms ease;}
 .bat.swing{transform:rotate(28deg) translate(6px,-4px);}
-.player-label{font-size:14px;font-weight:bold;fill:#fff;text-anchor:middle;pointer-events:none;}
+.player-label{font-size:28px; font-weight:bold; fill:#ffffff; text-anchor:middle; pointer-events:none;}
 #ball{width:18px;height:18px;border-radius:50%;background:red;position:absolute;transform:translate(-50%,-50%);transition:left 600ms cubic-bezier(.2,.9,.2,1), top 600ms cubic-bezier(.2,.9,.2,1);z-index:200;box-shadow: 0 6px 12px rgba(0,0,0,0.45), inset 0 -2px 6px rgba(0,0,0,0.18);}
-#playBtn{
-  display:block;
-  margin:100px auto 0 auto; /* center under scoreboard */
-  width:140px;
-  height:140px;
-  border-radius:50%;
-  border:none;
-  background:#ffd166;
-  color:#000;
-  font-weight:bold;
-  font-size:64px;
-  cursor:pointer;
-  box-shadow:0 6px 12px rgba(0,0,0,0.45);
-  display:flex;
-  align-items:center;
-  justify-content:center;
+.striker-bounce {animation: bump 0.6s ease;}
+@keyframes bump {0% { transform: translateY(0) rotate(0deg); }35% { transform: translateY(-12px) rotate(-6deg); }100% { transform: translateY(0) rotate(0deg); }}
+#playBtn{display:block;margin:100px auto 0 auto;width:140px;height:140px;border-radius:50%;border:none;background:#ffd166;color:#000;font-weight:bold;font-size:64px;cursor:pointer;box-shadow:0 6px 12px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;}
+
+.floating-background-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 215, 0, 0.1); /* semi-transparent */
+  font-size: 15px;
+  font-weight: bold;
+  text-align: center; /* center multiple lines */
+  line-height: 1.2;
+  white-space: nowrap;
+  z-index: 1; /* behind everything */
+  animation: floatBack 10s ease-in-out infinite alternate;
+  pointer-events: none;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
 }
+
+@keyframes floatBack {
+  0% { transform: translate(-50%, -50%) translateX(-100px); }
+  50% { transform: translate(-50%, -50%) translateX(100px); }
+  100% { transform: translate(-50%, -50%) translateX(-100px); }
+}
+
+
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="fico-wrap">
-    <svg class="svg-root bob" viewBox="0 0 64 64">
-      <circle cx="32" cy="12" r="7.5" fill="#ffd7b5"/>
-      <rect x="22" y="20" width="20" height="24" rx="4" fill="#0ea5a3"/>
-      <rect x="14" y="22" width="8" height="14" rx="3" fill="#0ea5a3"/>
-      <rect x="42" y="22" width="8" height="14" rx="3" fill="#0ea5a3"/>
-      <rect x="24" y="44" width="8" height="12" rx="2" fill="#333"/>
-      <rect x="34" y="44" width="8" height="12" rx="2" fill="#333"/>
-    </svg>
-    <div style="color:#fffff;font-weight:bold;margin-top:6px;">FICO</div>
-  </div>
+<audio id="batSound" src="cricket_bat_sound.mp3" preload="auto"></audio>
+<div class="floating-background-text">
+  SAP Cricket<br>Premier League
+</div>
 
+<div class="app">
+  
   <div>
     <div class="scoreboard">
-      <h2>Ledger</h2>
-      <div class="score-item"><span>Transaction No</span><span id="txnNo">100000000</span></div>
-      <div class="score-item"><span>Income</span><span id="income">80000+</span></div>
-      <div class="score-item"><span>Expense</span><span id="expense">40000+</span></div>
-      <div class="score-item"><span>Asset</span><span id="asset">2.5Cr</span></div>
+      <h2>Scoreboard</h2>
+      <div class="score-item"><span>Target</span><span id="targetRuns">0</span></div>
+      <div class="score-item"><span>Runs</span><span id="runs">0</span></div>
+      <div class="score-item"><span>Overs</span><span id="overs">0.0</span></div>
+      <div class="score-item"><span>Wickets</span><span id="wickets">0</span></div>
+      <div class="score-item"><span>Runs Needed</span><span id="runsNeeded">0</span></div>
     </div>
 
-    <!-- Play button below scoreboard -->
     <button id="playBtn">🏏</button>
   </div>
 
@@ -99,7 +105,40 @@ const canvas=document.getElementById('groundCanvas');
 const ctx=canvas.getContext('2d');
 const ballEl=document.getElementById('ball');
 const playBtn=document.getElementById('playBtn');
-const txnNoEl=document.getElementById('txnNo');
+
+// Scoreboard elements
+const runsEl = document.getElementById('runs');
+const oversEl = document.getElementById('overs');
+const wicketsEl = document.getElementById('wickets');
+const targetEl = document.getElementById('targetRuns');
+const runsNeededEl = document.getElementById('runsNeeded');
+
+const target = 249;
+targetEl.textContent = target;
+let runs = 0, overs = 0, wickets = 0, balls = 0, move = 0;
+const movesCount = 6;
+const runsPerMove = [];
+let remaining = target;
+for(let i=0;i<movesCount;i++){
+  if(i===movesCount-1) runsPerMove.push(remaining);
+  else { const r=Math.floor(remaining/(movesCount-i)); runsPerMove.push(r); remaining-=r; }
+}
+
+function updateScore(){
+  if(move >= movesCount) return;
+  const addRuns = runsPerMove[move];
+  runs += addRuns;
+  balls++;
+  overs = (Math.floor(balls/6)) + ((balls%6)/10);
+  runsEl.textContent = runs;
+  oversEl.textContent = overs.toFixed(1);
+  runsNeededEl.textContent = Math.max(target - runs,0);
+  move++;
+  if(move === 3) wickets = 2;
+  if(move === 4) wickets = 3;
+  wicketsEl.textContent = wickets;
+  
+}
 
 function resizeCanvas(){const r=ground.getBoundingClientRect();canvas.width=r.width;canvas.height=r.height;}
 resizeCanvas(); window.addEventListener('resize',resizeCanvas);
@@ -119,19 +158,17 @@ function createHuman(label,withBat,shirt="#0ea5a3"){
   return wrap;
 }
 
-// Create players
-const bowler=createHuman('SD',false,'#0ea5a3');
-const striker=createHuman('ABAP',true);
-const nonStriker=createHuman('ABAP',true,'#0ea5a3');
-const f1=createHuman('MM',false);
-const f2=createHuman('MM',false);
-const f3=createHuman('PP',false);
-const f4=createHuman('PP',false);
-const f5=createHuman('SD',false);
+let bowler=createHuman('',false,'#0ea5a3');
+let striker=createHuman('SD',true,'#0ea5a3');
+let nonStriker=createHuman('FICO',true,'#0ea5a3');
+const f1=createHuman('',false,'#0ea5a3');
+const f2=createHuman('',false,'#0ea5a3');
+const f3=createHuman('',false,'#0ea5a3');
+const f4=createHuman('',false,'#0ea5a3');
+const f5=createHuman('',false,'#0ea5a3');
 
 function setPos(el,x,y){ el.style.left=x+'px'; el.style.top=y+'px'; }
 function setBallAt(el){ ballEl.style.left=el.style.left; ballEl.style.top=el.style.top; }
-
 function placePlayers(){
   const r=ground.getBoundingClientRect();
   const W=r.width,H=r.height,cx=W/2,cy=H/2;
@@ -142,15 +179,10 @@ function placePlayers(){
   setPos(f2,cx+220,cy+30);
   setPos(f3,cx,cy+200);
   setPos(f4,cx-180,cy+80);
-  setPos(f5,cx-220,cy-40);
+  setPos(f5,cx-180,cy-30);
   setBallAt(bowler);
 }
 placePlayers();
-
-const sequence=[bowler,striker,f1,f2,f3,f4,f5,bowler];
-let idx=0;
-
-function updateTxnNo(){ txnNoEl.textContent=(100000000 + Math.floor(Math.random()*900000000)); }
 
 function drawTrail(fromEl,toEl){
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -161,18 +193,90 @@ function drawTrail(fromEl,toEl){
   ctx.lineWidth=2; ctx.setLineDash([6,6]); ctx.stroke();
   setTimeout(()=>ctx.clearRect(0,0,canvas.width,canvas.height),700);
 }
+function swingBat(p){ const bat=p.querySelector('.bat'); if(bat){ bat.classList.add('swing'); setTimeout(()=>bat.classList.remove('swing'),300);
 
-function swingBat(p){ const bat=p.querySelector('.bat'); if(bat){ bat.classList.add('swing'); setTimeout(()=>bat.classList.remove('swing'),300);} }
+const sound = document.getElementById('batSound');
+        if(sound){
+            sound.currentTime = 0; // restart if already playing
+            sound.play();
+        }} }
+const fielders = [f1,f2,f3,f4,f5];
+function pickRandomFielder(){ return fielders[Math.floor(Math.random()*fielders.length)]; }
 
-playBtn.addEventListener('click',()=>{
-  const prev=sequence[idx]; idx=(idx+1)%sequence.length;
-  const next=sequence[idx];
-  drawTrail(prev,next);
-  setBallAt(next);
-  if(prev===bowler && next===striker){ swingBat(striker); }
-  updateTxnNo();
+function labelEl(player){ return player.querySelector('.player-label'); }
+function bounceStrikerLabel(newText){
+  const lbl = labelEl(striker);
+  lbl.classList.remove('striker-bounce');
+  void lbl.offsetWidth;
+  lbl.textContent = newText;
+  lbl.classList.add('striker-bounce');
+  setTimeout(()=> lbl.classList.remove('striker-bounce'),600);
+}
+
+// Updated verticalSwap to also swap references
+function verticalSwap(callback){
+  const sTop = parseFloat(striker.style.top);
+  const nsTop = parseFloat(nonStriker.style.top);
+  const sLeft = parseFloat(striker.style.left);
+  const nsLeft = parseFloat(nonStriker.style.left);
+
+  striker.style.transition = 'top 2000ms ease, left 2000ms ease';
+  nonStriker.style.transition = 'top 2000ms ease, left 2000ms ease';
+
+  striker.style.top = nsTop+'px';
+  striker.style.left = nsLeft+'px';
+  nonStriker.style.top = sTop+'px';
+  nonStriker.style.left = sLeft+'px';
+
+  // Swap the variables themselves
+  const temp = striker;
+  striker = nonStriker;
+  nonStriker = temp;
+
+  setTimeout(()=>{ if(callback) callback(); },2000);
+}
+
+// Sequence state
+let seqState = 0;
+function applyAfterReturn(){
+  switch(seqState){
+    case 0: bounceStrikerLabel('MM'); seqState=1; break;
+    case 1: verticalSwap(()=>{ seqState=2; }); break;
+    case 2: verticalSwap(()=>{ labelEl(striker).textContent='PP'; seqState=3; }); break;
+    case 3: bounceStrikerLabel('ABAP'); seqState=4; break;
+    case 4: bounceStrikerLabel('SD'); seqState=0; break;
+  }
+}
+
+// Play button logic
+playBtn.addEventListener('click', ()=>{
+  if(move >= movesCount) return; // disable after match
+  updateScore(); // distribute runs per move
+
+  setBallAt(bowler);
+  drawTrail(bowler,striker);
+  setTimeout(()=>{ setBallAt(striker); swingBat(striker); },50);
+
+  setTimeout(()=>{
+    const f = pickRandomFielder();
+    drawTrail(striker,f);
+    setTimeout(()=> setBallAt(f),50);
+
+    setTimeout(()=>{
+      drawTrail(f,bowler);
+      setTimeout(()=>{
+        setBallAt(bowler);
+        applyAfterReturn();
+
+        if(move === movesCount){
+          setTimeout(()=> alert("🏆 Batting Team Wins!"), 100);
+          playBtn.disabled = true;
+        }
+
+      },650);
+    },700);
+  },700);
 });
-updateTxnNo();
 })();
 </script>
 </body>
